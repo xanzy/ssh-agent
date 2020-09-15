@@ -22,7 +22,7 @@
 package sshagent
 
 import (
-	"fmt"
+	"errors"
 	"io"
 	"net"
 	"sync"
@@ -56,9 +56,8 @@ func New() (agent.Agent, net.Conn, error) {
 	}
 	conn, err := winio.DialPipe(sshAgentPipe, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf(
-			"SSH agent requested but Pageant not running and Error %v",
-			err,
+		return nil, nil, errors.New(
+			"SSH agent requested, but could not detect Pageant or Windows native SSH agent",
 		)
 	}
 	return agent.NewClient(conn), nil, nil
