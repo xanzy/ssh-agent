@@ -4,7 +4,7 @@ Create a new [agent.Agent](https://godoc.org/golang.org/x/crypto/ssh/agent#Agent
 
 ## Limitations
 
-When compiled for Windows, it will only support [Pageant](http://the.earth.li/~sgtatham/putty/0.66/htmldoc/Chapter9.html#pageant) as the SSH authentication agent.
+When compiled for Windows, it will support [Pageant](http://the.earth.li/~sgtatham/putty/0.66/htmldoc/Chapter9.html#pageant) as the SSH authentication agent or Windows native SSH agent.
 
 ## Credits
 
