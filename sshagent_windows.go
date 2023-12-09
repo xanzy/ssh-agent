@@ -26,6 +26,8 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
+	"strings"
 	"sync"
 
 	"github.com/Microsoft/go-winio"
@@ -33,15 +35,19 @@ import (
 )
 
 const (
-	sshAgentPipe = `\\.\pipe\openssh-ssh-agent`
+	pipe             = `\\.\pipe\`
+	openSSHAgentPipe = pipe + "openssh-ssh-agent"
 )
 
-// Available returns true if Pageant is running
+// Available returns true if Pageant is running.
 func Available() bool {
 	if pageantWindow() != 0 {
 		return true
 	}
-	conn, err := winio.DialPipe(sshAgentPipe, nil)
+	if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
+		return true
+	}
+	conn, err := winio.DialPipe(openSSHAgentPipe, nil)
 	if err != nil {
 		return false
 	}
@@ -50,18 +56,34 @@ func Available() bool {
 }
 
 // New returns a new agent.Agent and the (custom) connection it uses
-// to communicate with a running pagent.exe instance (see README.md)
+// to communicate with a running pagent.exe instance (see README.md).
 func New() (agent.Agent, net.Conn, error) {
 	if pageantWindow() != 0 {
 		return agent.NewClient(&conn{}), nil, nil
 	}
+
+	sshAgentPipe := openSSHAgentPipe
+	if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
+		conn, err := net.Dial("unix", sshAuthSock)
+		if err == nil {
+			return agent.NewClient(conn), conn, nil
+		}
+
+		if !strings.HasPrefix(sshAuthSock, pipe) {
+			sshAuthSock = pipe + sshAuthSock
+		}
+
+		sshAgentPipe = sshAuthSock
+	}
+
 	conn, err := winio.DialPipe(sshAgentPipe, nil)
 	if err != nil {
 		return nil, nil, errors.New(
 			"SSH agent requested, but could not detect Pageant or Windows native SSH agent",
 		)
 	}
-	return agent.NewClient(conn), nil, nil
+
+	return agent.NewClient(conn), conn, nil
 }
 
 type conn struct {
