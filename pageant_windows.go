@@ -36,7 +36,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Maximum size of message can be sent to pageant
+// Maximum size of message can be sent to pageant.
 const MaxMessageLen = 8192
 
 var (
@@ -76,8 +76,6 @@ func winAPI(dll *windows.LazyDLL, funcName string) func(...uintptr) (uintptr, ui
 }
 
 // Query sends message msg to Pageant and returns response or error.
-// 'msg' is raw agent request with length prefix
-// Response is raw agent response with length prefix
 func query(msg []byte) ([]byte, error) {
 	if len(msg) > MaxMessageLen {
 		return nil, ErrMessageTooLong
