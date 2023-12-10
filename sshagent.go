@@ -28,7 +28,7 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
-// New returns a new agent.Agent that uses a unix socket
+// New returns a new agent.Agent that uses a unix socket.
 func New() (agent.Agent, net.Conn, error) {
 	if !Available() {
 		return nil, nil, errors.New("SSH agent requested but SSH_AUTH_SOCK not-specified")
@@ -44,7 +44,7 @@ func New() (agent.Agent, net.Conn, error) {
 	return agent.NewClient(conn), conn, nil
 }
 
-// Available returns true is a auth socket is defined
+// Available returns true if an auth socket is defined.
 func Available() bool {
 	return os.Getenv("SSH_AUTH_SOCK") != ""
 }

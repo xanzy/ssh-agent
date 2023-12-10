@@ -29,22 +29,26 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Microsoft/go-winio"
 	"golang.org/x/crypto/ssh/agent"
 )
 
 const (
-	PIPE         = `\\.\pipe\`
-	sshAgentPipe = PIPE + "openssh-ssh-agent"
+	pipe             = `\\.\pipe\`
+	openSSHAgentPipe = pipe + "openssh-ssh-agent"
 )
 
-// Available returns true if Pageant is running
+// Available returns true if Pageant is running.
 func Available() bool {
 	if pageantWindow() != 0 {
 		return true
 	}
-	conn, err := winio.DialPipe(sshAgentPipe, nil)
+	if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
+		return true
+	}
+	conn, err := winio.DialPipe(openSSHAgentPipe, nil)
 	if err != nil {
 		return false
 	}
@@ -53,37 +57,34 @@ func Available() bool {
 }
 
 // New returns a new agent.Agent and the (custom) connection it uses
-// to communicate with a running pagent.exe instance (see README.md)
+// to communicate with a running pagent.exe instance (see README.md).
 func New() (agent.Agent, net.Conn, error) {
-	// Get env "SSH_AUTH_SOCK" and connect.
-	// ssh and ssh-add on Windows can get keys from pipe by path in env "SSH_AUTH_SOCK"
-	sockPath := os.Getenv("SSH_AUTH_SOCK")
-	sock, err := net.Dial("unix", sockPath) // for some versions of Windows
-
-	if err != nil {
-		if len(sockPath) == 0 {
-			sockPath = sshAgentPipe
-		}
-		if !strings.HasPrefix(sockPath, PIPE) {
-			sockPath = PIPE + sockPath
-		}
-		sock, err = winio.DialPipe(sockPath, nil)
-		if err != nil {
-			if pageantWindow() != 0 {
-				ag := agent.NewClient(&conn{})
-				return ag, ag.(net.Conn), nil
-			}
-		}
+	if pageantWindow() != 0 {
+		return agent.NewClient(&conn{}), &conn{}, nil
 	}
 
+	sshAgentPipe := openSSHAgentPipe
+	if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
+		conn, err := net.Dial("unix", sshAuthSock)
+		if err == nil {
+			return agent.NewClient(conn), conn, nil
+		}
+
+		if !strings.HasPrefix(sshAuthSock, pipe) {
+			sshAuthSock = pipe + sshAuthSock
+		}
+
+		sshAgentPipe = sshAuthSock
+	}
+
+	conn, err := winio.DialPipe(sshAgentPipe, nil)
 	if err != nil {
 		return nil, nil, errors.New(
 			"SSH agent requested, but could not detect Pageant or Windows native SSH agent",
 		)
-	} else {
-		// connect SSH_AUTH_SOCK
-		return agent.NewClient(sock), sock, nil
 	}
+
+	return agent.NewClient(conn), conn, nil
 }
 
 type conn struct {
@@ -91,10 +92,11 @@ type conn struct {
 	buf []byte
 }
 
-func (c *conn) Close() {
+func (c *conn) Close() error {
 	c.Lock()
 	defer c.Unlock()
 	c.buf = nil
+	return nil
 }
 
 func (c *conn) Write(p []byte) (int, error) {
@@ -123,4 +125,21 @@ func (c *conn) Read(p []byte) (int, error) {
 	c.buf = c.buf[n:]
 
 	return n, nil
+}
+
+// for similarity with net.Conn
+func (c *conn) LocalAddr() net.Addr {
+	return nil
+}
+func (c *conn) RemoteAddr() net.Addr {
+	return nil
+}
+func (c *conn) SetDeadline(_ time.Time) error {
+	return nil
+}
+func (c *conn) SetReadDeadline(_ time.Time) error {
+	return nil
+}
+func (c *conn) SetWriteDeadline(_ time.Time) error {
+	return nil
 }
