@@ -29,6 +29,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Microsoft/go-winio"
 	"golang.org/x/crypto/ssh/agent"
@@ -59,7 +60,7 @@ func Available() bool {
 // to communicate with a running pagent.exe instance (see README.md).
 func New() (agent.Agent, net.Conn, error) {
 	if pageantWindow() != 0 {
-		return agent.NewClient(&conn{}), nil, nil
+		return agent.NewClient(&conn{}), &conn{}, nil
 	}
 
 	sshAgentPipe := openSSHAgentPipe
@@ -91,10 +92,11 @@ type conn struct {
 	buf []byte
 }
 
-func (c *conn) Close() {
+func (c *conn) Close() error {
 	c.Lock()
 	defer c.Unlock()
 	c.buf = nil
+	return nil
 }
 
 func (c *conn) Write(p []byte) (int, error) {
@@ -123,4 +125,21 @@ func (c *conn) Read(p []byte) (int, error) {
 	c.buf = c.buf[n:]
 
 	return n, nil
+}
+
+// for similarity with net.Conn
+func (c *conn) LocalAddr() net.Addr {
+	return nil
+}
+func (c *conn) RemoteAddr() net.Addr {
+	return nil
+}
+func (c *conn) SetDeadline(_ time.Time) error {
+	return nil
+}
+func (c *conn) SetReadDeadline(_ time.Time) error {
+	return nil
+}
+func (c *conn) SetWriteDeadline(_ time.Time) error {
+	return nil
 }
